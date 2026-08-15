@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# 编辑器/系统
+*.swp
+*~
+.idea/
+.vscode/
+
+# 临时产物
+node_modules/
+dist/

@@ -85,4 +85,19 @@ flowchart LR
 - 感谢三个开源项目及其维护者：pi、DeepSeek Harness（dsh）、OpenAI Codex。
   正是他们把生产级别的 Agent 代码开源，才有了这本书。
 
+
+## 本书对应的代码版本
+
+书中所有代码片段（尤其是第 6-8 章代码精读）引用的**文件路径与行号，均基于下表列出的 commit**。三个代码库都在持续演进，更新版本的代码可能使行号偏移、文件改名，请以下表 commit 为基准核对。
+
+| 代码库 | 仓库 | 本书对应的 commit | 提交日期 |
+|--------|------|------------------|---------|
+| pi | github.com/earendil-works/pi | `086c32e74` | 2026-08-15 |
+| dsh（DeepSeek Harness） | github.com/deepseek-ai/deepseek-harness | `47f943859b` | 2026-08-13 |
+| codex（OpenAI Codex） | github.com/openai/codex | `85fc4def35` | 2026-08-15 |
+
+> 在本机核对当前版本：`git -C <代码库路径> rev-parse HEAD`。
+> 若三个库已有新 commit，行号可能漂移，请以各仓库最新代码为准。
+
+
 现在，我们正式开始。从最基础的问题开始：**Agent 到底长什么样？**

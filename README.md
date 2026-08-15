@@ -74,11 +74,21 @@ mdbook serve --open   # http://localhost:3000
 └── .github/workflows/deploy.yml  # 自动构建并部署到 GitHub Pages
 ```
 
-## 配套源码
+## 配套源码与版本
 
 - **pi**：<https://github.com/earendil-works/pi>
-- **dsh（DeepSeek Harness）**：本仓库
+- **dsh（DeepSeek Harness）**：<https://github.com/deepseek-ai/deepseek-harness>
 - **codex（OpenAI Codex CLI）**：<https://github.com/openai/codex>
+
+> 本书代码片段（尤其第 6-8 章代码精读）引用的文件路径与行号，对应以下 commit：
+
+| 代码库 | commit | 提交日期 |
+|--------|--------|---------|
+| pi | `086c32e74` | 2026-08-15 |
+| dsh（DeepSeek Harness） | `47f943859b` | 2026-08-13 |
+| codex（OpenAI Codex） | `85fc4def35` | 2026-08-15 |
+
+代码持续演进，行号可能漂移，请以上表为基准核对；本地核对：`git -C <路径> rev-parse HEAD`。
 
 ## 许可
 

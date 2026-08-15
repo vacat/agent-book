@@ -256,6 +256,6 @@ codex 同样支持并行工具调用（`tools/parallel.rs`），并且额外考�
 
 ---
 
-**下一章**：[第 4 章 模型接入：从 API 到统一抽象](04-模型接入.md)
+**下一章**：[第 4 章 模型接入：从 API 到统一抽象](./ch04-model-access.md)
 模型是 Agent 的"大脑"。这一章我们看看，Agent 框架如何把各家模型 API
 （OpenAI、Anthropic、DeepSeek……）统一到一个抽象之下。

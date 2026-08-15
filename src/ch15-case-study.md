@@ -207,4 +207,4 @@ flowchart TB
 
 ---
 
-**下一部分**：[附录 A 术语表](../附录/A-术语表.md)
+**下一部分**：[附录 A 术语表](./appendix-a-glossary.md)

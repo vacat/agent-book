@@ -7,7 +7,7 @@
 > 4. 为一个真实模型 API（兼容 OpenAI Chat Completions 的，如 DeepSeek）写工具调用。
 
 > **本章是全书"动手"核心**。请一定打开编辑器，把代码敲出来、跑起来、改一改。
-> 代码全文在 [示例/minimal-agent.ts](https://github.com/vacat/agent-book/blob/main/04-实践篇/示例/minimal-agent.ts)，跟着本章一步步写。
+> 代码全文在 [示例/minimal-agent.ts](./example/minimal-agent.ts)，跟着本章一步步写。
 
 ## 14.1 我们要做什么
 
@@ -312,5 +312,5 @@ async function callModelWithRetry(...) {
 
 ---
 
-**下一章**：[第 15 章 综合案例：让三个代码库协作](15-综合案例.md)
+**下一章**：[第 15 章 综合案例：让三个代码库协作](./ch15-case-study.md)
 最后一章，我们做一个"三库协作"的综合案例，把全书知识串成一条完整的链。

@@ -1,0 +1,34 @@
+[book]
+title = "Agent 技术实战：从零读懂三大 Agent 代码库"
+authors = ["Javen.C"]
+language = "zh"
+src = "src"
+description = "面向普通技术人员的大模型与 Agent 技术书籍，结合 pi / dsh / codex 三个开源 Agent 代码库逐行讲解推理循环、工具、上下文与安全"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/vacat/agent-book"
+edit-url-template = "https://github.com/vacat/agent-book/edit/main/{path}"
+additional-css = ["theme/custom.css"]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+# 启用中文搜索
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[output.html.fold]
+enable = true
+level = 0
+
+# 渲染 mermaid 流程图（与 llm-inference-book 同一套 mdBook 方案，
+# 仅因本书含大量流程图而启用官方 preprocessor）
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

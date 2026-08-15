@@ -166,5 +166,5 @@ def agent_loop(user_message, system_prompt, tools, llm):
 
 ---
 
-**下一章**：[第 6 章 代码精读（一）：pi 的推理循环](06-代码精读-pi.md)
+**下一章**：[第 6 章 代码精读（一）：pi 的推理循环](./ch06-code-pi.md)
 现在开始真正的"逐行读代码"。第一站选 pi——因为它最简洁、最像教科书。

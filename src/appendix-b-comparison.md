@@ -31,10 +31,10 @@
 | 概念 | pi | dsh | codex |
 |------|-----|-----|-------|
 | 消息类型 | `Message`（ai/types.ts） | `Message`（llm/message.ts） | `ResponseItem` |
-| 角色 | system/user/assistant | system/user/assistant | role + item 类型 |
-| 工具结果角色 | user（ToolResultMessage） | user（ToolResultMessage） | `function_call_output` |
+| 角色 | system/user/assistant/toolResult | system/developer/user/assistant/tool | role + item 类型 |
+| 工具结果角色 | `toolResult`（ToolResultMessage） | `tool`（ToolResultMessage） | `function_call_output` |
 | 会话容器 | `context.messages`（内存） | `Session` 事件日志 | `Session` 持久化 |
-| 持久化 | 可选 session-backends | 核心不变量 | 内建 + 世界状态 |
+| 持久化 | 独立 `durable` harness（SQLite / JSONL） | 核心不变量 | 内建 + 世界状态 |
 | 模型输入来源 | `context.messages` | `session.deriveMessages()` | `clone_history().for_prompt()` |
 
 ## 4. 模型接入

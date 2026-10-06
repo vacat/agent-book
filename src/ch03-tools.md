@@ -39,10 +39,11 @@ export interface ToolSchema {
   name: string                 // 工具名
   description: string          // 用途说明（给模型看的）
   parameters: Record<string, unknown>  // 参数定义（JSON Schema）
+  deferLoading?: true          // 请求把定义延后加载进模型上下文（可选）
 }
 ```
 
-就这三个字段。`parameters` 是一个 JSON Schema 对象，描述每个参数的
+核心就这三个字段（外加一个可选的 `deferLoading`）。`parameters` 是一个 JSON Schema 对象，描述每个参数的
 类型、必填、取值范围。模型正是读这份 schema 来"学会"怎么调用你的工具。
 
 `GenerateOptions.tools` 就是这样一个 schema 数组，随请求一起发给模型：
@@ -61,10 +62,11 @@ pi 在 `packages/agent/src/types.ts` 定义了 `AgentTool`，它比 dsh 多了�
 export interface AgentTool<TParameters extends TSchema = TSchema, TDetails = any>
   extends Tool<TParameters> {
   label: string;                                  // 界面显示名
-  prepareArguments?: (args: unknown) => TParameters;  // 参数兼容转换（可选）
+  prepareArguments?: (args: unknown) => Static<TParameters>;  // 参数兼容转换（可选）
+  outputSchema?: TSchema;                         // structuredContent 的 JSON Schema（可选）
   execute: (                                  // ← 真正的执行函数
     toolCallId: string,
-    params: TParameters,
+    params: Static<TParameters>,
     signal?: AbortSignal,
     onUpdate?: AgentToolUpdateCallback<TDetails>,
   ) => Promise<AgentToolResult<TDetails>>;
@@ -116,7 +118,7 @@ sequenceDiagram
     Loop->>Tool: execute(id, params, signal)
     Tool->>Tool: 运行 shell 命令，收集输出
     Tool-->>Loop: 返回 ToolResult(输出文本)
-    Loop->>Loop: 把结果封装成 user 角色消息
+   Loop->>Loop: 把结果封装成 tool 角色消息
     Loop-->>Model: 下次请求带上"工具结果"消息
 ```
 
@@ -128,7 +130,9 @@ sequenceDiagram
 `type: "tool-call"`、`id`（本次调用的唯一标识）、`name`（工具名）、
 `arguments`（**JSON 字符串**！）。
 
-> 注意：`arguments` 是**字符串**，不是对象。因为模型的输出天然是文本。
+> 注意：在 dsh 的 `ToolCallBlock` 里 `arguments` 是**字符串**，不是对象——
+> 因为模型的输出天然是文本（pi 流里的 `toolcall_delta.delta` 同理；
+> 等装配完成、schema 校验之后，pi 的 `ToolCall.arguments` 才是 `JsonObject`）。
 > 代码需要再解析一次。dsh 里就有这样一个 `parseArguments` 函数
 > （`packages/core/agent-loop/src/tool-calls.ts`）：
 
@@ -153,15 +157,21 @@ dsh 里执行工具前，会先通过 `ctx.tools.executionMode(...)` 判断这�
 应该**串行还是并行**执行（我们稍后讲）。pi 里则是直接找到 `context.tools` 中
 名字匹配的 `AgentTool`，调用它的 `execute`。
 
-### 第 3 步：把结果封装成"user 角色消息"回传
+### 第 3 步：把结果封装成"工具结果消息"回传
 
 工具执行完后，结果被封装成一条**工具结果消息**（dsh 的 `createToolResultMessage`），
-它保留了 `callId`，让模型能对应上"这是上次那次调用的结果"。
+它带着 `toolCallId`，让模型能对应上"这是上次那次调用的结果"：
 
 ```ts
 // dsh packages/llm/llm/src/message.ts（节选，简化）
 export function createToolResultMessage(input: ToolResultMessageInput): ToolResultMessage {
-  // role: 'user'，content 里放一个 type:'tool-result' 的块
+  return createMessage({
+    role: 'tool',                              // 独立的 tool 角色
+    source: { kind: 'tool', callId: input.callId },
+    toolCallId: input.callId,                  // 对应哪次调用
+    content: input.content,
+    isError: input.isError,
+  })
 }
 ```
 
@@ -240,7 +250,7 @@ codex 同样支持并行工具调用（`tools/parallel.rs`），并且额外考�
 
 - **工具 = schema（说明书）+ execute（执行函数）**；
 - 模型通过 tool-call 块声明"我要调用工具"，参数以 JSON 字符串形式传递；
-- 工具结果被封装成 user 角色消息回传，作为下一轮模型的输入；
+- 工具结果被封装成独立的 `tool` 角色消息回传，作为下一轮模型的输入；
 - 多个工具调用可串行可并行；并行执行也要按模型顺序返回结果；
 - 说明书（description）质量决定模型能否正确使用工具。
 
@@ -251,8 +261,8 @@ codex 同样支持并行工具调用（`tools/parallel.rs`），并且额外考�
    读文件的（用了 Node/Bun 的什么 API）。
 2. **写一个"今日天气"工具**：模仿 pi 的 `AgentTool` 结构，写一个查询
    （模拟）天气的工具，定义好 schema 和 execute。不要求真正联网。
-3. **思考题**：为什么 `arguments` 是 JSON 字符串而不是对象？如果某次模型输出
-   了残缺的 JSON，你的代码应该怎么办？（参考答案见附录 C）
+3. **思考题**：为什么模型输出的 `arguments` 先是 JSON 字符串而不是对象？
+   如果某次模型输出了残缺的 JSON，你的代码应该怎么办？（参考答案见附录 C）
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **本章目标**
 > 1. 理解 Agent 的"记忆"由什么构成：消息（Message）、会话（Session）、上下文（Context）；
-> 2. 掌握三种核心消息角色：user / assistant / tool result；
+> 2. 掌握核心消息角色：system / user / assistant / tool（工具结果）；
 > 3. 看懂消息内部的结构：内容块（content block）与工具调用块；
 > 4. 对照三个代码库，看它们如何定义和组织消息。
 
@@ -33,20 +33,22 @@ flowchart LR
 
 我们第 11 章会深入这条铁律，现在先建立直觉。
 
-## 2.2 三种消息角色：谁在说话
+## 2.2 消息角色：谁在说话
 
 模型收到的"对话记录"是一串**消息（Message）**。绝大多数模型 API 里，
-每条消息都有一个 **role（角色）**，告诉模型"这句话是谁说的"。最基本的角色：
+每条消息都有一个 **role（角色）**，告诉模型"这句话是谁说的"。最常见的角色：
 
 | 角色 | 是谁 | 在代码库里的名字 |
 |------|------|------------------|
 | `system` | 系统/工作手册 | system prompt |
-| `user` | 用户/工具结果 | user message |
+| `user` | 用户输入 | user message |
 | `assistant` | Agent 自己 | assistant message |
+| `tool` | 工具返回的结果 | tool result message |
 
-其中有个容易混淆的点：**工具结果在 API 层面通常也归为 `user` 角色**。
-因为从模型的角度看，"工具返回的结果"是外部世界给它的"输入"，和用户说话是同一类来源。
-我们用三个代码库的真实定义来验证这一点。
+其中最容易被混为一谈的是**工具结果算谁说的话**——不同系统给了不同答案：
+OpenAI 的 Chat Completions 把它单列成 `tool` 角色，Anthropic 则折叠进 `user`
+消息。pi 和 dsh 都选择了"单列"：pi 用 `role: "toolResult"`，dsh 用
+`role: 'tool'`。我们用三个代码库的真实定义来验证这一点。
 
 ### pi 的消息模型
 
@@ -58,9 +60,13 @@ pi 里消息类型定义在 `packages/ai/src/types.ts`，Agent 层在
 // pi packages/ai/src/types.ts（节选）
 export interface AssistantMessage {
   role: "assistant";
-  content: AssistantContentPart[]; // 可能是 text / thinking / toolCall
-  stopReason?: string;
-  usage?: Usage;
+  content: (TextContent | ThinkingContent | ToolCall)[]; // text / thinking / toolCall
+  api: Api;
+  provider: ProviderId;
+  model: string;
+  usage: Usage;
+  stopReason: StopReason;
+  timestamp: number;
 }
 ```
 
@@ -71,7 +77,7 @@ export interface AssistantMessage {
   "role": "assistant",
   "content": [
     { "type": "text", "text": "我先用 bash 统计一下行数。" },
-    { "type": "toolCall", "id": "call_1", "name": "bash", "arguments": "find . -name '*.ts' | xargs wc -l" }
+    { "type": "toolCall", "id": "call_1", "name": "bash", "arguments": { "command": "find . -name '*.ts' | xargs wc -l" } }
   ]
 }
 ```
@@ -79,24 +85,32 @@ export interface AssistantMessage {
 ### dsh 的消息模型
 
 dsh 的消息定义在 `packages/llm/llm/src/message.ts` 和 `types.ts`。
-它把消息收敛为**同一种表示**（`Message`），再派生三个子类型，角色只有三种：
+它先定义一份共有的 `MessageBase`，再按角色派生五个子类型：
 
 ```ts
 // dsh packages/llm/llm/src/message.ts（节选）
-export interface Message {
-  readonly role: 'system' | 'user' | 'assistant'  // 只有三种角色
-  readonly content: ContentBlock[]                 // 内容块数组
+interface MessageBase {                          // 所有消息共有的字段
+  readonly id: MessageId                         // 稳定身份
+  readonly content: readonly ContentBlock[]      // 内容块数组
+  readonly source: MessageSource                 // 谁生产的
 }
 
-export interface UserMessage extends Message { readonly role: 'user' }
-export interface AssistantMessage extends Message { readonly role: 'assistant' }
+export interface SystemMessage    extends MessageBase { readonly role: 'system' }
+export interface DeveloperMessage extends MessageBase { readonly role: 'developer' }  // 工具增删等
+export interface UserMessage      extends MessageBase { readonly role: 'user' }
+export interface AssistantMessage extends MessageBase { readonly role: 'assistant' }
 
-/** 工具结果的特殊化：user 角色 + 保留调用关联 */
-export interface ToolResultMessage extends Message { readonly role: 'user' }
+/** 工具结果是一等消息：独立的 tool 角色 + 调用关联 */
+export interface ToolResultMessage extends MessageBase {
+  readonly role: 'tool'
+  readonly toolCallId: ToolCallId
+  readonly isError?: boolean
+}
 ```
 
-注意 dsh 那句注释：**工具结果（ToolResultMessage）也是 `user` 角色**，
-只是保留了一个"调用关联"（call correlation），让模型知道这个结果对应哪次工具调用。
+注意 `ToolResultMessage`：**工具结果是一种独立的 `tool` 角色消息**，
+`toolCallId` 保留"这个结果对应哪次工具调用"的关联。系统提示、开发者消息
+（工具增删）也各有自己的角色。
 
 dsh 的内容块类型（`packages/llm/llm/src/types.ts`）用 `ContentBlockMap` 合并扩展：
 
@@ -105,9 +119,14 @@ dsh 的内容块类型（`packages/llm/llm/src/types.ts`）用 `ContentBlockMap`
 export interface TextBlock      { type: 'text';      text: string }
 export interface ReasoningBlock { type: 'reasoning'; text: string }   // 思考过程
 export interface ImageBlock     { type: 'image';     ... }
-export interface ToolCallBlock  { type: 'tool-call'; id: CallId; name: string; arguments: string }
-export interface ToolResultBlock{ type: 'tool-result'; callId: CallId; ... }
+export interface FileBlock      { type: 'file';      ... }
+export interface ToolCallBlock  { type: 'tool-call'; id: ToolCallId; name: string; arguments: string }
+export interface ToolAdditionBlock { type: 'tool-addition'; ... }     // 工具变得可见
+export interface ToolRemovalBlock  { type: 'tool-removal';  ... }
 ```
+
+注意：**工具结果不是内容块**（内容块里没有 `tool-result`），而是上面那个
+独立的 `ToolResultMessage` 消息。
 
 一个"模型说要调 bash 工具"的 assistant 消息，在 dsh 里长这样：
 
@@ -134,8 +153,11 @@ Responses API 的术语。它也是一个带 `type` 的枚举，常见的有：
 | `message` | 一条消息（里面再分 role） |
 | `function_call` | 一次函数（工具）调用 |
 | `function_call_output` | 函数调用的输出（结果） |
-| `computer_call` | 调起沙箱/终端 |
+| `reasoning` | 模型的思考条目 |
+| `custom_tool_call` / `custom_tool_call_output` | 自定义工具（如自由文本工具）的调用与结果 |
 | `local_shell_call` | 本地 shell 调用 |
+| `web_search_call` | 联网搜索调用 |
+| `compaction` | 上下文压缩条目 |
 
 在后面第 8 章精读 codex 时，你会看到它循环里反复出现"这个回合返回了什么类型的
 ResponseItem"，再根据类型决定是执行工具还是结束回合。
@@ -150,14 +172,14 @@ flowchart TB
     subgraph "消息数组（时间从上到下）"
         M1["① user: 帮我统计行数"]
         M2["② assistant: 我调用 bash"]
-        M3["③ user(tool result): 共 12345 行"]
+        M3["③ tool(result): 共 12345 行"]
         M4["④ assistant: 共 42 个文件 12345 行"]
     end
 ```
 
 一次完整的"思考—行动—观察"会往数组里追加 **至少两条** 消息：
 - 第 ② 条：assistant 说要调用工具；
-- 第 ③ 条：工具结果（role 为 user）。
+- 第 ③ 条：工具结果（独立的 `tool` 角色消息，带 `toolCallId`）。
 
 然后下一轮，模型会看到 ①②③ 全部历史，继续输出第 ④ 条。这个"追加历史 → 再请求"的
 模式，正是下一章"工具"和第五章"推理循环"的基础。
@@ -171,7 +193,7 @@ flowchart TB
 | 消息类型定义 | `packages/ai/src/types.ts` | `packages/llm/llm/src/message.ts` | `codex-rs/core/src/...`（ResponseItem 由 protocol 定义） |
 | 会话状态容器 | `AgentContext.messages` | `Session`（持久化日志） | `Session`（`clone_history()`） |
 | 消息追加点 | `context.messages.push(...)` | `session.append('user/message' \| 'assistant/message', ...)` | `sess.record_conversation_items(...)` |
-| 工具结果角色 | `role: "user"`（ToolResultMessage） | `role: "user"`（ToolResultMessage） | `function_call_output`（独立条目） |
+| 工具结果角色 | `role: "toolResult"`（ToolResultMessage） | `role: 'tool'`（ToolResultMessage） | `function_call_output`（独立条目） |
 
 这里藏着一个重要的架构分叉，提前剧透：
 
@@ -190,16 +212,18 @@ flowchart TB
 然后回答：
 
 1. `content` 数组里可能有哪些 `type`？找全它们（text / thinking / toolCall / image 等）。
-2. 一个 `toolCall` 块有哪些字段？`arguments` 是字符串还是对象？为什么是字符串？
-   （提示：模型输出的参数是一段 JSON 文本，需要解析，见第 7 章 `parseArguments`。）
+2. 一个 `ToolCall` 块有哪些字段？流式过程中的 `toolcall_delta.delta` 是什么类型，
+   装配完成的 `ToolCall.arguments` 又是什么类型？为什么两者不同？
+   （提示：模型输出的参数是一段 JSON 文本，需要逐步累积再解析，见第 3 章 `parseArguments`。）
 
 在 dsh 仓库里，找到 `packages/llm/llm/src/types.ts` 的 `ContentBlockMap`，
-对比它和 pi 的 `AssistantContentPart`，数一数两边各自支持多少种内容块。
+对比它和 pi 的 `AssistantMessage.content` 联合类型，数一数两边各自支持多少种内容块。
 
 ## 2.6 本章小结
 
 - 模型没有记忆，它的"记忆"就是每次发给它的消息数组；
-- 消息有三种核心角色：system / user / assistant；工具结果归为 user 角色；
+- 消息的常见角色有 system / user / assistant / tool；工具结果在 pi / dsh 里
+  用独立的 `toolResult` / `tool` 角色消息表示，而不是塞进 `user`；
 - 消息内部是"内容块"数组，其中 `tool-call` 块是 Agent 能力的钥匙；
 - pi 的消息在内存里，dsh / codex 的消息在持久化会话里；
 - 三个代码库的消息模型高度一致，因为它们都遵循主流模型 API 的约定。
@@ -208,8 +232,8 @@ flowchart TB
 
 1. 打开三个代码库，分别找到"assistant 消息"的类型定义，写出每个库里
    "模型要调用工具"的消息长什么样（JSON 形式）。
-2. 思考题：为什么工具结果要用 `user` 角色而不是单独的 `tool` 角色？
-   提示：想一想老模型 API 不认识 `tool` 角色时会怎样。
+2. 思考题：为什么有的 API 把工具结果单列成 `tool` 角色，有的却折叠进 `user`
+   消息？提示：想一想各家 API 的演进历史，以及"老模型不认识 `tool` 角色"会怎样。
 
 ---
 

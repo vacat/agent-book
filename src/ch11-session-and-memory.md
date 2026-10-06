@@ -24,8 +24,9 @@
 
 dsh 选择的是**事件日志**（而且是"追加式"的：只追加、不改写）。
 这是它所有"严谨性"的地基。codex 也走类似路线（持久化历史 + 世界状态）。
-pi 的运行时本身不持久化，但提供了 `session-backends`（SQLite）这类**可选后端**，
-把"是否持久化"留给了使用方。
+pi 把这两件事拆成了两层：内核 `packages/agent` 只维护内存消息数组，另有一个
+实验性的持久化 harness `packages/durable`（SQLite / JSONL 存储），
+把"是否持久化"留给使用方。
 
 ## 11.2 dsh 的会话：事件溯源（Event Sourcing）
 
@@ -47,13 +48,15 @@ dsh 的会话模块是 `packages/core/session/`。它的设计总结在 `index.t
 this.session.append('turn/start', { turn })                 // 回合开始
 this.session.append('step/start', { turn, step })           // 步骤开始
 this.session.append('user/message', message, ...)           // 用户消息
-this.session.append('assistant/chunk', { turn, step, chunk })  // 每个流式块！
-this.session.append('assistant/message', {...}, { sourceEventSeqs: chunkSeqs })  // 完整 assistant 消息
+this.session.append('assistant/message', { turn, step, message, stream })  // 完整消息 + 精确流
+this.session.append('assistant/attempt', { turn, step, stream })  // 未产出消息的尝试
 this.session.append('step/end', { turn, step })             // 步骤结束
 this.session.append('turn/end', { turn, reason })           // 回合结束
 ```
 
-**连"每个流式块"都记**——这是"极致可复现"的表现：任何一次模型输出，都能从
+**连"流式输出"都记**——`assistant/message` 内嵌该次请求的精确带时间流
+（`AssistantStreamAttempt` 逐块累积），没有产出消息的失败尝试则落成
+`assistant/attempt`。这是"极致可复现"的表现：任何一次模型输出，都能从
 日志里精确回放。日志是唯一的真相源（source of truth），内存里的任何东西
 都只是它的"派生视图"。
 
@@ -67,7 +70,7 @@ this.session.append('turn/end', { turn, reason })           // 回合结束
 
 ```mermaid
 flowchart LR
-    LOG[追加式事件日志<br/>turn/start, user/message,<br/>assistant/chunk×N,<br/>assistant/message, tool/result, ...]
+    LOG[追加式事件日志<br/>turn/start, user/message,<br/>assistant/message, tool/result, ...]
     SURF[表面层 surface<br/>折叠出模型可见消息]
     REQ[发给模型的请求<br/>deriveMessages]
     LOG --> SURF --> REQ
@@ -106,19 +109,28 @@ dsh 的 AGENTS.md 里有一条铁律，值得在这里反复强调：
 日志是持久化的，就可能跨版本读取。dsh 用 `SESSION_FORMAT_VERSION`（当前为 `0`）
 标记日志格式。AGENTS.md 里说：
 
-> SQLite uses monotonic `SCHEMA_VERSION`; `dsh-session` keeps
-> `SESSION_FORMAT_VERSION` at `0` with no compatibility promise.
+> 一旦某个格式随产品发布（released），它就冻结成"不可变的旧代（immutable
+> prior generation）"，只能**追加**相邻的 `n→n+1` 转换包——绝不移动、覆盖或
+> 删除已提交的世代。
 
-**`0` 意味着"没有兼容承诺"**——格式变就整体升级（因为还没有外部消费者，
-这是 dsh "基础优先于兼容"的立场）。但"有版本号"这件事本身很重要：
-一旦有消费者，就能靠版本号做迁移。
+所以仓库里能直接看到 `session-format-v0-to-v1` … `v3-to-v4` 这些**相邻转换包**：
+跨版本读日志时，走一条 `n→n+1` 的转换链把它在内存里升到当前格式。
+
+**当前**：工作区写入器 `SESSION_FORMAT_VERSION` 是 `4`，最新已定版
+（finalized）也是 `4`，而最新**已发布**（released）记录为 `3`
+（依据 `docs/session-format-status.md`——这些数字随版本演进，请以你本地仓库为准）。
 
 ### 快照（snapshot）
 
 纯事件日志无限增长会很占空间、回放很慢。生产系统通常会用
 **周期性快照 + 事件增量**的组合：隔一段时间把状态折叠成一个快照存档，
 之后只记增量事件；要重建时从最近快照开始 + 重放增量。
-（dsh 的存储/会话插件里有相关实现；codex 的 thread store 同样考虑快照。）
+
+dsh 侧对应的机制是**耐久检查点**（`packages/session/session-checkpoint-policy`）：
+在每次模型请求前、有外部副作用的工具执行前、以及下一步开始前，强制把已发生的
+事实写进持久日志，做到"崩溃后无损恢复"（长历史的折叠则用 surface 的 `replace`
+把旧消息换成摘要，日志本身仍 append-only）。codex 的 thread store 同样考虑
+快照与恢复。
 
 ## 11.4 codex 的会话：持久化 + 世界状态
 
@@ -135,21 +147,29 @@ codex 的 `clone_history()` 和 dsh 的 `deriveMessages()` 思想一致：
 **每次请求的输入从持久化历史派生**。codex 还额外持久化"回合元数据"
 （`turn_metadata.rs`：模型、时间、usage 等），用于审计与遥测。
 
-## 11.5 pi 的会话：内存优先，后端可选
+## 11.5 pi 的会话：内存内核 + 独立 durable harness
 
-pi 的核心循环**不持久化**（这是刻意的简）。但它为"需要持久化的人"提供了
-`packages/session-backends/`（SQLite 等）。也就是说：
+pi 把会话分成了两层：
+
+- **`packages/agent`（`@earendil-works/pi-agent-core`）**：核心循环，消息放在内存
+  的 `context.messages` 数组里，**本身不持久化**——这是刻意的简，便于嵌入和测试；
+- **`packages/durable`（`@earendil-works/pi-durable`，标注为**实验性**）**：
+  一个持久化 agent harness。对话、模型回合、工具调用都在**展示之前先提交到
+  存储**；进程中途死掉，重新打开存储就能从断点继续。存储后端可换：SQLite
+  （`openNodeSqliteStorage("./session.sqlite")`）、JSONL，或纯内存。
+
+也就是说：
 
 - **开箱即用**：`context.messages` 内存数组，最简单；
-- **需要时**：接上 session-backends，把会话存进 SQLite；
-- **哲学**：持久化是"可选能力"，不是"核心不变量"。
+- **需要持久化**：改用 durable harness，把会话存进 SQLite / JSONL；
+- **哲学**：持久化是**另一层可选的 harness**，不是内循环的一部分。
 
 对比三库的会话哲学：
 
 | 维度 | pi | dsh | codex |
 |------|-----|-----|-------|
 | 运行时会话 | 内存数组 | 内存 store + 日志 | 持久化历史 |
-| 持久化 | 可选后端 | 事件日志（核心） | 内建（核心） |
+| 持久化 | 独立 `durable` harness（SQLite / JSONL） | 事件日志（核心） | 内建（核心） |
 | 可回放 | 否 | **是（逐块回放）** | 是 |
 | "模型可见⟺可记录" | 无保证 | **核心不变量** | 隐含（历史派生） |
 | 世界状态 | 无 | 无（有上下文投影） | 有 |
@@ -175,14 +195,15 @@ pi 的核心循环**不持久化**（这是刻意的简）。但它为"需要持
 - dsh 会话 = 追加式日志 + 内存 store + 派生消息历史；
 - **"模型可见 ⟺ 可记录"** 是 dsh 的核心不变量：请求是日志的函数；
 - 表面层（surface）从日志折叠出模型可见消息，支持压缩替换；
-- 格式版本（SESSION_FORMAT_VERSION）为日志演进提供迁移依据；
+- 格式版本（SESSION_FORMAT_VERSION，当前为 `4`）+ 相邻转换包（v0→v1→…→v4）
+  为日志演进提供迁移路径，已发布的格式世代不可改写；
 - codex 在历史之上加了"世界状态"；pi 把持久化做成可选后端。
 
 ## 动手练习
 
 1. **看一条真实日志**：在 dsh 跑一个简单任务，打开会话日志，
    找出"一次模型请求"对应哪些事件（request/header、user/message、
-   assistant/chunk、assistant/message……），确认它们能拼出完整请求。
+   assistant/message、assistant/attempt……），确认它们能拼出完整请求。
 2. **试 deriveMessages**：读 `packages/core/session/src/surface.ts`，
    数一数 `SURFACE_EVENT_TYPES` 里有哪些类型，想想要不要加
    `turn/start`？（提示：模型不需要看到"回合开始"这种管理事件。）

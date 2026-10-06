@@ -137,14 +137,15 @@ Agent 就可能"忘记自己正在干什么"。
 
 codex 把压缩做进了回合主循环（第 8 章 8.3 节的"⑥"分支）：
 
-- 采样后检查 token 状态，发现触顶就调用 `run_auto_compact`（`turn.rs` 1160 行起）；
+- 采样后检查 token 状态，发现触顶就调用 `run_auto_compact`（`turn.rs` 1482 行起）；
 - 压缩时用 `CompactionReason::ContextLimit` 标记原因，并**重建世界状态**
   （`InitialContextInjection::BeforeLastUserMessage`）——把文件系统、环境等
   环境快照在压缩后重新注入，**让模型即使看到的是摘要，也知道当前文件长什么样**；
 - 压缩完成后 `continue`，用新的（更短的）历史继续采样。
 
-它还有一整套子模块：`compact.rs`（核心）、`compact_remote.rs`（远程压缩，调用
-云端做摘要）、`compact_token_budget.rs`（压缩预算）。甚至支持"压缩失败时回退到
+它还有一整套子模块：`compact.rs`（核心）、`compact_remote_history.rs` /
+`compact_remote_v2.rs`（远程压缩，调用云端做摘要）、`compact_token_budget.rs`
+（压缩预算）、`compact_model_fallback.rs`（换模型压缩）。甚至支持"压缩失败时回退到
 更小的模型"（`compact_model_fallback.rs`）。
 
 ### 10.4.3 pi 的压缩：CLI 层的"分支总结"

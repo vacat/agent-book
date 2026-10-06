@@ -92,9 +92,9 @@ flowchart LR
 
 | 代码库 | 仓库 | 本书对应的 commit | 提交日期 |
 |--------|------|------------------|---------|
-| pi | github.com/earendil-works/pi | `086c32e74` | 2026-08-15 |
-| dsh（DeepSeek Harness） | github.com/deepseek-ai/deepseek-harness | `47f943859b` | 2026-08-13 |
-| codex（OpenAI Codex） | github.com/openai/codex | `85fc4def35` | 2026-08-15 |
+| pi | github.com/earendil-works/pi | `b7dfc049e` | 2026-10-05 |
+| dsh（DeepSeek Harness） | github.com/deepseek-ai/deepseek-harness | `49120665f` | 2026-09-26 |
+| codex（OpenAI Codex） | github.com/openai/codex | `823ea830c` | 2026-10-05 |
 
 > 在本机核对当前版本：`git -C <代码库路径> rev-parse HEAD`。
 > 若三个库已有新 commit，行号可能漂移，请以各仓库最新代码为准。

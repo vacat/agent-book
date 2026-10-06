@@ -12,14 +12,16 @@
 
 ## 第 2 章
 
-1. **查消息内容类型**：pi 的 `AssistantContentPart` 至少包括 text / thinking /
-   toolCall / image 等；dsh 的 `ContentBlockMap` 至少包括 text / reasoning /
-   image / tool-call / tool-result。**要点**：`toolCall` 块的 `arguments` 是
-   **字符串**（模型输出是文本），需要解析。
-2. **思考题：工具结果为什么用 `user` 角色？**
+1. **查消息内容类型**：pi 的 `AssistantMessage.content` 至少包括 text / thinking /
+   toolCall 等；dsh 的 `ContentBlockMap` 至少包括 text / reasoning / image /
+   file / tool-call / tool-addition / tool-removal。**要点**：dsh 的
+   `tool-call` 块 `arguments` 是**字符串**（模型输出是文本），需要解析；
+   pi 流里的 `toolcall_delta.delta` 同理，装配后才成为 `JsonObject`。
+2. **思考题：工具结果为什么有的 API 单列 `tool` 角色、有的折叠进 `user`？**
    - 从模型角度看，工具结果是"外部世界给它的输入"，和用户说话是同类来源；
-   - 老模型 API 不认识 `tool` 角色，用 `user` 保证兼容性；
-   - 为了区分"用户说的"和"工具返回的"，需要额外字段（如 `toolCallId`）做关联。
+   - 老模型 API 不认识 `tool` 角色，Anthropic 等把它折叠进 `user` 消息；
+   - OpenAI Chat Completions 与 pi / dsh 则单列 `tool`/`toolResult`，并用一个
+     关联字段（`toolCallId`）把它和对应的调用对上。
 
 ## 第 3 章
 
@@ -68,8 +70,8 @@
 
 ## 第 7 章
 
-1. **读会话日志**：完成标准——找到 turn/start、user/message、assistant/chunk×N、
-   assistant/message、tool/result、turn/end 等事件的顺序。
+1. **读会话日志**：完成标准——找到 turn/start、user/message、assistant/message、
+   tool/result、turn/end 等事件的顺序。
 2. **打断它**：`steer()` 投到 `next-step`，模型下一轮会看到转向消息并调整方向。
 3. **改瀑布**：完成标准——注册 `agent/pre-step` 监听器，返回加入额外上下文的
    `{ kind: 'enter', messages: [...claimed, extra] }`。

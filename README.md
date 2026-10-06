@@ -84,9 +84,9 @@ mdbook serve --open   # http://localhost:3000
 
 | 代码库 | commit | 提交日期 |
 |--------|--------|---------|
-| pi | `086c32e74` | 2026-08-15 |
-| dsh（DeepSeek Harness） | `47f943859b` | 2026-08-13 |
-| codex（OpenAI Codex） | `85fc4def35` | 2026-08-15 |
+| pi | `b7dfc049e` | 2026-10-05 |
+| dsh（DeepSeek Harness） | `49120665f` | 2026-09-26 |
+| codex | `823ea830c` | 2026-10-05 |
 
 代码持续演进，行号可能漂移，请以上表为基准核对；本地核对：`git -C <路径> rev-parse HEAD`。
 

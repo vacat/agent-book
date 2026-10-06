@@ -36,16 +36,16 @@ Agent: 总共有 N 行。
 
 ## 14.2 第一步：消息与会话（第 2 章）
 
-先定义消息类型。我们的 Agent 只需要三类消息：
+先定义消息类型。我们的 Agent 需要四类消息：
 
 ```ts
-type Role = 'system' | 'user' | 'assistant';
+type Role = 'system' | 'user' | 'assistant' | 'tool';
 
 interface Message {
   role: Role;
   content: string;          // 文本内容
   toolCalls?: ToolCall[];   // assistant 消息才可能有：本次要调用的工具
-  toolCallId?: string;      // user 消息才可能有：这条是对哪次工具调用的结果
+  toolCallId?: string;      // tool 消息才有：这条是对哪次工具调用的结果
 }
 
 interface ToolCall {
@@ -55,7 +55,7 @@ interface ToolCall {
 }
 ```
 
-**对照第 2 章**：工具结果我们用 `role: 'user'` + `toolCallId` 标记，
+**对照第 2 章**：工具结果我们用独立的 `role: 'tool'` + `toolCallId` 标记，
 和 dsh / pi 的做法一致。
 
 会话就是：
@@ -197,8 +197,8 @@ async function runAgent(userInput: string, apiKey: string, baseUrl: string, mode
             result = `错误：${err.message}`;
           }
         }
-        // ④ 观察：把结果放回历史（role: user + toolCallId）
-        messages.push({ role: 'user', content: result, toolCallId: call.id });
+        // ④ 观察：把结果放回历史（role: tool + toolCallId）
+        messages.push({ role: 'tool', content: result, toolCallId: call.id });
       }
       // 回到 while 顶部，模型会看到工具结果 → 再次思考
       continue;
@@ -218,7 +218,7 @@ async function runAgent(userInput: string, apiKey: string, baseUrl: string, mode
 | 发请求（历史+工具） | `callModel(messages, ...)` |
 | 找工具调用 | `assistant.toolCalls && assistant.toolCalls.length > 0` |
 | 执行工具 | `tool.execute(args)` |
-| 结果放回历史 | `messages.push({ role: 'user', content: result, toolCallId: call.id })` |
+| 结果放回历史 | `messages.push({ role: 'tool', content: result, toolCallId: call.id })` |
 | 有 → 继续循环 | `continue` |
 | 没有 → 返回 | `console.log(assistant.content); return` |
 

@@ -8,7 +8,7 @@
  * 依赖：Node.js 18+（原生 fetch）。无第三方依赖。
  * 模型：OpenAI 兼容的 Chat Completions API（DeepSeek 等）。
  */
-type Role = 'system' | 'user' | 'assistant';
+type Role = 'system' | 'user' | 'assistant' | 'tool';
 
 interface ToolCall {
   id: string;
@@ -20,7 +20,7 @@ interface Message {
   role: Role;
   content: string;          // 文本内容
   toolCalls?: ToolCall[];   // assistant 消息才可能有
-  toolCallId?: string;      // user 消息才可能有：对哪次工具调用的结果
+  toolCallId?: string;      // tool 消息才有：对哪次工具调用的结果
 }
 
 interface Tool {
@@ -168,8 +168,8 @@ async function runAgent(
             result = `错误：${err?.message ?? String(err)}`;
           }
         }
-        // ④ 观察：把结果放回历史（role: user + toolCallId）
-        messages.push({ role: 'user', content: result, toolCallId: call.id });
+        // ④ 观察：把结果放回历史（role: tool + toolCallId）
+        messages.push({ role: 'tool', content: result, toolCallId: call.id });
       }
       continue; // 模型会看到工具结果，回到 while 顶部再次思考
     }

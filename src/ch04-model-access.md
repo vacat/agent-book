@@ -53,7 +53,7 @@ dsh 把这两件事打包成一个 `GenerateOptions` 请求结构（第 3 章见
 | { type: 'block-start'; index: number; blockType: ContentBlockType }  // 某个内容块开始
 | { type: 'text-delta'; index: number; text: string }                 // 一段文本增量
 | { type: 'reasoning-delta'; index: number; text: string }            // 思考过程增量
-| { type: 'tool-call-delta'; index: number; id: CallId; name?: string; argumentsDelta: string }
+| { type: 'tool-call-delta'; index: number; id: ToolCallId; name?: string; argumentsDelta: string }
 | { type: 'block-end'; index: number; block: ContentBlock }           // 某个内容块结束
 | { type: 'usage'; usage: TokenUsage }
 | { type: 'finish'; reason: ... }                                     // 生成结束

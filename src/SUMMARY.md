@@ -37,3 +37,4 @@
 - [附录 B 三库速查对照表](./appendix-b-comparison.md)
 - [附录 C 练习参考答案](./appendix-c-answers.md)
 - [附录 D 延伸阅读与资源](./appendix-d-resources.md)
+- [附录 E 三库的编译、打包与跨语言协作](./appendix-e-build-and-packaging.md)

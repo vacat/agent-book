@@ -111,15 +111,15 @@ codex 的工具体系最重，由 `ToolSpec`（说明书）+ `CoreToolRuntime`�
 ```mermaid
 sequenceDiagram
     participant Model as 大模型
-    participant Loop as 推理循环
+    participant AgentLoop as 推理循环
     participant Tool as bash 工具
-    Model->>Loop: 输出 tool-call 块(name=bash, arguments=...)
-    Loop->>Loop: 解析 arguments(JSON字符串→对象)
-    Loop->>Tool: execute(id, params, signal)
+    Model->>AgentLoop: 输出 tool-call 块(name=bash, arguments=...)
+    AgentLoop->>AgentLoop: 解析 arguments(JSON字符串→对象)
+    AgentLoop->>Tool: execute(id, params, signal)
     Tool->>Tool: 运行 shell 命令，收集输出
-    Tool-->>Loop: 返回 ToolResult(输出文本)
-   Loop->>Loop: 把结果封装成 tool 角色消息
-    Loop-->>Model: 下次请求带上"工具结果"消息
+    Tool-->>AgentLoop: 返回 ToolResult(输出文本)
+    AgentLoop->>AgentLoop: 把结果封装成 tool 角色消息
+    AgentLoop-->>Model: 下次请求带上"工具结果"消息
 ```
 
 把每一步拆开看：

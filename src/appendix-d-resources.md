@@ -6,7 +6,7 @@
 
 - **pi 官网**：<https://pi.dev> —— 文档、demo、API 参考。
 - **pi 仓库**：<https://github.com/earendil-works/pi> —— 代码与贡献指南。
-- **DeepSeek Harness（dsh）**：本仓库。先读 `docs/architecture.md`（架构总览）、
+- **DeepSeek Harness（dsh）**：先读 `docs/architecture.md`（架构总览）、
   `docs/AGENTS.md`（文档规范）、`docs/cordis-primer.md`（Cordis 入门）、
   `docs/defensive-patterns.md`（防御模式）。
 - **codex 仓库**：<https://github.com/openai/codex> —— 代码、`docs/` 目录、

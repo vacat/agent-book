@@ -92,7 +92,7 @@ pi（<https://github.com/earendil-works/pi>）是一个用 TypeScript + Bun 编�
 
 ### dsh：一个"一切皆插件"的企业级框架
 
-dsh（DeepSeek Harness）是本书所在仓库，是一个基于 Cordis 的插件化 Agent 框架。
+dsh（<https://github.com/deepseek-ai/deepseek-harness>）是一个基于 Cordis 的插件化 Agent 框架。
 它的核心理念在 AGENTS.md 里写着：**"everything is a plugin（一切皆插件）"**。
 它把 Agent 拆成几十个小包：
 
@@ -107,7 +107,7 @@ dsh（DeepSeek Harness）是本书所在仓库，是一个基于 Cordis 的插�
 
 ### codex：一个"生产级"的 Rust Agent
 
-codex（OpenAI Codex CLI）是 OpenAI 官方开源的命令行编程 Agent，用 Rust 编写。
+codex（OpenAI Codex CLI，<https://github.com/openai/codex>）是 OpenAI 官方开源的命令行编程 Agent，用 Rust 编写。
 它每天被大量开发者使用，所以它的代码里充满了对**稳定性、安全、性能**的极致追求。
 核心代码在 `codex-rs/core/src/`：
 

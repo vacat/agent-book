@@ -157,8 +157,8 @@ dsh 的 `LlmRuntime` 建立在 Cordis 的 **waterfall（瀑布）** 机制上。
 ```mermaid
 flowchart LR
     Req[请求] --> W1[插件 A 拦截]
-    W1 -->|调用 next()| W2[插件 B 拦截]
-    W2 -->|调用 next()| W3[真正调用适配器]
+    W1 -->|"调用 next()"| W2[插件 B 拦截]
+    W2 -->|"调用 next()"| W3[真正调用适配器]
     W3 --> Resp[响应流]
 ```
 
